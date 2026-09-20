@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Objetos encontrados - Lost & Found</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+
+            <a class="navbar-brand fw-bold" href="index.html">
+                🔎 Lost & Found
+            </a>
+
+            <button class="navbar-toggler"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#navbarNav">
+
+                <span class="navbar-toggler-icon"></span>
+
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+
+                <ul class="navbar-nav ms-auto">
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="lost.html">
+                            Objetos perdidos
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link active" href="found.html">
+                            Objetos encontrados
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="publish.html">
+                            Publicar
+                        </a>
+                    </li>
+
+                </ul>
+
+            </div>
+        </div>
+    </nav>
+
+
+    <!-- TÍTULO -->
+    <section class="page-title">
+
+        <div class="container text-center">
+
+            <h1>🟢 Objetos encontrados</h1>
+
+            <p class="lead mb-0">
+                Objetos que fueron encontrados
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <!-- CONTENIDO -->
+    <main class="container my-5">
+
+        <div id="loading" class="text-center">
+            <p>Cargando objetos...</p>
+        </div>
+
+        <div id="itemsContainer"
+             class="row g-4">
+        </div>
+
+    </main>
+
+
+    <!-- FOOTER -->
+    <footer class="bg-dark text-white text-center py-4">
+
+        <p class="mb-0">
+            Lost & Found © 2026
+        </p>
+
+        <small>
+            Sistema escolar de objetos perdidos y encontrados
+        </small>
+
+    </footer>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="app.js"></script>
+
+    <script>
+
+        async function loadFoundItems() {
+
+            const container = document.getElementById("itemsContainer");
+            const loading = document.getElementById("loading");
+
+            const { data, error } = await supabaseClient
+                .from("items")
+                .select("*")
+                .eq("type", "found")
+                .eq("status", "active")
+                .order("created_at", { ascending: false });
+
+
+            loading.style.display = "none";
+
+
+            if (error) {
+
+                console.error(error);
+
+                container.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-danger">
+                            Error al cargar los objetos.
+                        </div>
+                    </div>
+                `;
+
+                return;
+            }
+
+
+            if (!data || data.length === 0) {
+
+                container.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-info text-center">
+                            No hay objetos encontrados publicados actualmente.
+                        </div>
+                    </div>
+                `;
+
+                return;
+            }
+
+
+            container.innerHTML = data.map(item => `
+
+                <div class="col-md-6 col-lg-4">
+
+                    <div class="item-card">
+
+                        ${
+                            item.image_url
+                            ? `<img src="${item.image_url}" alt="${item.name}">`
+                            : `
+                                <div class="d-flex align-items-center justify-content-center bg-light"
+                                     style="height:220px;font-size:60px;">
+                                    📦
+                                </div>
+                            `
+                        }
+
+                        <div class="item-content">
+
+                            <span class="badge bg-success mb-2">
+                                Encontrado
+                            </span>
+
+                            <h3>${item.name}</h3>
+
+                            <p>
+                                ${item.description || "Sin descripción"}
+                            </p>
+
+                            <p class="mb-1">
+                                📍 <strong>Lugar:</strong>
+                                ${item.location || "No especificado"}
+                            </p>
+
+                            <p class="mb-3">
+                                📅 <strong>Fecha:</strong>
+                                ${item.date || "No especificada"}
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            `).join("");
+
+        }
+
+
+        loadFoundItems();
+
+    </script>
+
+</body>
+</html>
