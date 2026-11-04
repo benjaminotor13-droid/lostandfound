@@ -85,7 +85,11 @@
 
 <main class="login-container">
     <section class="login-card">
-
+<div id="publishNotice" class="alert alert-info" style="display: none;">
+    <strong>¿Querés publicar un objeto?</strong>
+    <br>
+    Primero debes registrarte o iniciar sesión para continuar.
+</div>
         <div id="loginSection">
             <p class="text-uppercase small fw-bold text-secondary">
                 Acceso escolar
@@ -166,139 +170,154 @@
 <script src="app.js"></script>
 
 <script>
-    const googleButton = document.getElementById("googleButton");
-    const loginSection = document.getElementById("loginSection");
-    const usernameSection = document.getElementById("usernameSection");
-    const usernameForm = document.getElementById("usernameForm");
-    const usernameInput = document.getElementById("usernameInput");
-    const usernameButton = document.getElementById("usernameButton");
-    const loginMessage = document.getElementById("loginMessage");
+   
+const googleButton = document.getElementById("googleButton");
+const loginSection = document.getElementById("loginSection");
+const usernameSection = document.getElementById("usernameSection");
+const usernameForm = document.getElementById("usernameForm");
+const usernameInput = document.getElementById("usernameInput");
+const usernameButton = document.getElementById("usernameButton");
+const loginMessage = document.getElementById("loginMessage");
+const publishNotice = document.getElementById("publishNotice");
 
-    const SCHOOL_DOMAIN = "@ccgymmart.edu.py";
 
-    function showMessage(message, type = "danger") {
-        loginMessage.innerHTML = `
-            <div class="alert alert-${type}" role="alert">
-                ${message}
-            </div>
-        `;
+
+// Recordar a qué página quería ir el usuario.
+// Solo permitimos destinos definidos por nosotros.
+const requestedPage = new URLSearchParams(window.location.search).get("next");
+
+const nextPage = requestedPage === "publish.html"
+    ? "publish.html"
+    : "index.html";
+
+if (nextPage === "publish.html") {
+    publishNotice.style.display = "block";
+}
+
+function showMessage(message, type = "danger") {
+    loginMessage.innerHTML = `
+        <div class="alert alert-${type}" role="alert">
+            ${message}
+        </div>
+    `;
+}
+
+function clearMessage() {
+    loginMessage.innerHTML = "";
+}
+
+async function checkUser() {
+    const { data: { user }, error } =
+        await supabaseClient.auth.getUser();
+
+    if (error || !user) return;
+
+    
+    const { data: profile, error: profileError } =
+        await supabaseClient
+            .from("profiles")
+            .select("id, username")
+            .eq("id", user.id)
+            .maybeSingle();
+
+    if (profileError) {
+        showMessage("No se pudo comprobar tu perfil. Intenta nuevamente.");
+        console.error(profileError);
+        return;
     }
 
-    function clearMessage() {
-        loginMessage.innerHTML = "";
+    if (profile) {
+        window.location.replace(nextPage);
+    } else {
+        loginSection.style.display = "none";
+        usernameSection.style.display = "block";
+    }
+}
+
+googleButton.addEventListener("click", async () => {
+    clearMessage();
+
+    googleButton.disabled = true;
+    googleButton.textContent = "Conectando...";
+
+    const redirectUrl =
+        window.location.origin + "/login.html?next=" + nextPage;
+
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+            redirectTo: redirectUrl
+        }
+    });
+
+    if (error) {
+        showMessage("No se pudo iniciar sesión con Google.");
+        console.error(error);
+
+        googleButton.disabled = false;
+        googleButton.textContent = "Continuar con Google";
+    }
+});
+
+usernameForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    clearMessage();
+
+    const username = usernameInput.value.trim();
+
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(username)) {
+        showMessage(
+            "El nombre debe tener entre 3 y 20 caracteres y solo puede contener letras, números o guion bajo."
+        );
+        return;
     }
 
-    async function checkUser() {
-        const { data: { user }, error } =
-            await supabaseClient.auth.getUser();
+    usernameButton.disabled = true;
+    usernameButton.textContent = "Creando perfil...";
 
-        if (error || !user) return;
+    const { data: { user }, error: userError } =
+        await supabaseClient.auth.getUser();
 
-        const email = (user.email || "").toLowerCase();
+    if (userError || !user) {
+        showMessage("Tu sesión no está activa. Inicia sesión nuevamente.");
 
-        if (!email.endsWith(SCHOOL_DOMAIN)) {
-            await supabaseClient.auth.signOut();
-
-            showMessage(
-                "Debes iniciar sesión con tu correo institucional del colegio."
-            );
-            return;
-        }
-
-        const { data: profile, error: profileError } =
-            await supabaseClient
-                .from("profiles")
-                .select("id, username")
-                .eq("id", user.id)
-                .maybeSingle();
-
-        if (profileError) {
-            showMessage("No se pudo comprobar tu perfil. Intenta nuevamente.");
-            console.error(profileError);
-            return;
-        }
-
-        if (profile) {
-            window.location.href = "index.html";
-        } else {
-            loginSection.style.display = "none";
-            usernameSection.style.display = "block";
-        }
+        usernameButton.disabled = false;
+        usernameButton.textContent = "Crear perfil";
+        return;
     }
 
-    googleButton.addEventListener("click", async () => {
-        clearMessage();
-        googleButton.disabled = true;
-        googleButton.textContent = "Conectando...";
+    const email = (user.email || "").toLowerCase();
 
-        const { error } = await supabaseClient.auth.signInWithOAuth({
-            provider: "google",
-            options: {
-                redirectTo: window.location.origin + "/login.html",
-                queryParams: {
-                    hd: "ccgymmart.edu.py"
-                }
-            }
+    
+
+    const { error } = await supabaseClient
+        .from("profiles")
+        .insert({
+            id: user.id,
+            username: username
         });
 
-        if (error) {
-            showMessage("No se pudo iniciar sesión con Google.");
+    if (error) {
+        if (error.code === "23505") {
+            showMessage("Ese nombre de usuario ya está ocupado. Prueba otro.");
+        } else {
+            showMessage("No se pudo crear tu perfil. Intenta nuevamente.");
             console.error(error);
-            googleButton.disabled = false;
-            googleButton.textContent = "Continuar con Google";
-        }
-    });
-
-    usernameForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        clearMessage();
-
-        const username = usernameInput.value.trim();
-
-        if (!/^[A-Za-z0-9_]{3,20}$/.test(username)) {
-            showMessage(
-                "El nombre debe tener entre 3 y 20 caracteres y solo puede contener letras, números o guion bajo."
-            );
-            return;
         }
 
-        usernameButton.disabled = true;
-        usernameButton.textContent = "Creando perfil...";
+        usernameButton.disabled = false;
+        usernameButton.textContent = "Crear perfil";
+        return;
+    }
 
-        const { data: { user }, error: userError } =
-            await supabaseClient.auth.getUser();
+    window.location.replace(nextPage);
+});
 
-        if (userError || !user) {
-            showMessage("Tu sesión no está activa. Inicia sesión nuevamente.");
-            usernameButton.disabled = false;
-            usernameButton.textContent = "Crear perfil";
-            return;
-        }
+checkUser();
+</script>
+</body>
+</html>
 
-        const { error } = await supabaseClient
-            .from("profiles")
-            .insert({
-                id: user.id,
-                username: username
-            });
-
-        if (error) {
-            if (error.code === "23505") {
-                showMessage("Ese nombre de usuario ya está ocupado. Prueba otro.");
-            } else {
-                showMessage("No se pudo crear tu perfil. Intenta nuevamente.");
-                console.error(error);
-            }
-
-            usernameButton.disabled = false;
-            usernameButton.textContent = "Crear perfil";
-            return;
-        }
-
-        window.location.href = "index.html";
-    });
-
-    checkUser();
 </script>
 
 </body>

@@ -346,19 +346,55 @@
 
     <script src="app.js"></script>
 
+<script>
+
+    let currentUser = null;
+
+    async function checkSession() {
+
+        const { data: { session }, error } =
+            await supabaseClient.auth.getSession();
+
+        if (error || !session) {
+
+            window.location.replace("login.html?next=publish.html");
+
+            return false;
+
+        }
+
+        currentUser = session.user;
+
+        return true;
+
+    }
+
+    checkSession().then((isLoggedIn) => {
+
+        if (!isLoggedIn) return;
+
+    });
+
+</script>
+
 
     <script>
 
-        const form = document.getElementById("publishForm");
+    const form = document.getElementById("publishForm");
+const message = document.getElementById("message");
+const submitButton = document.getElementById("submitButton");
 
-        const message = document.getElementById("message");
+form.addEventListener("submit", async function(event) {
 
-        const submitButton = document.getElementById("submitButton");
+    event.preventDefault();
 
+    if (!currentUser) {
+        window.location.replace("login.html?next=publish.html");
+        return;
+    }
 
-        form.addEventListener("submit", async function(event) {
-
-            event.preventDefault();
+        
+        
 
 
             submitButton.disabled = true;
@@ -469,7 +505,9 @@
 
                             image_url: imageUrl,
 
-                            status: "active"
+                            status: "active",
+
+                            user_id: currentUser.id
 
                         })
                         .select();
